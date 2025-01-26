@@ -13,7 +13,7 @@ import (
 type UserService interface {
 	SignUp(user *models.User) error
 	Login(creds models.Credentials) (string, error)
-	EnablePremiumFeature(userID int, feature string) error
+	EnablePremiumFeature(userID int, duration int, features []string) error
 }
 
 type userService struct {
@@ -80,7 +80,7 @@ func (s *userService) Login(creds models.Credentials) (string, error) {
 }
 
 // PurchasePremium activates a premium feature for a user
-func (s *userService) EnablePremiumFeature(userID int, feature string) error {
+func (s *userService) EnablePremiumFeature(userID int, duration int, features []string) error {
 	user, err := s.userRepo.GetUserByID(userID)
 	if err != nil {
 		return err
@@ -90,22 +90,32 @@ func (s *userService) EnablePremiumFeature(userID int, feature string) error {
 		return errors.New("user account is inactive")
 	}
 
-	switch feature {
-	case "remove_swipe_limit":
-		if user.PremiumFeatures.UnlimitedSwipes {
-			return errors.New("unlimited swipes is already active")
+	// Check if PremiumExpiry is in the future; extend or set it
+	newExpiry := time.Now().Add(time.Duration(duration) * 24 * time.Hour)
+	if user.PremiumExpiry != nil && user.PremiumExpiry.After(time.Now()) {
+		newExpiry = user.PremiumExpiry.Add(time.Duration(duration) * 24 * time.Hour)
+	}
+	user.PremiumExpiry = &newExpiry
+
+	// Enable the specified features
+	for _, feature := range features {
+		switch feature {
+		case "UnlimitedSwipes":
+			if user.PremiumFeatures.UnlimitedSwipes {
+				return errors.New("unlimited swipes is already active")
+			}
+			user.PremiumFeatures.UnlimitedSwipes = true
+		case "IsVerified":
+			if user.PremiumFeatures.IsVerified {
+				return errors.New("user is already verified")
+			}
+			user.PremiumFeatures.IsVerified = true
+		default:
+			return errors.New("invalid premium feature: " + feature)
 		}
-		user.PremiumFeatures.UnlimitedSwipes = true
-	case "verified_badge":
-		if user.PremiumFeatures.IsVerified {
-			return errors.New("user is already verified")
-		}
-		user.PremiumFeatures.IsVerified = true
-	default:
-		return errors.New("invalid premium feature")
 	}
 
-	user.PremiumExpiry = utils.TimePtr(time.Now().Add(30 * 24 * time.Hour))
+	// Update user and persist changes
 	user.UpdatedAt = time.Now()
 	s.userRepo.UpdateUser(user)
 	return nil

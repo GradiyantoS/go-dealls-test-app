@@ -69,6 +69,12 @@ Testing the application could use these command
     go test ./test/integration/api_integration_test.go
    ```
 
+### Postman Tests
+1. Open postman and click `import`,
+2. Drag or choose 2 files in the folder `test/postman_data`,
+3. Make sure the environment `dealls-env` already active,
+4. you Could try the collection `dealls-test`,for the protected API with `Authorization`, you could login to get `token` it will automatically register the `JWT Token` into the variable.
+
 ---
 ## Tech Stack
 - **Language**: Go

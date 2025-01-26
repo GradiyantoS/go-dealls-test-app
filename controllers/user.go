@@ -33,20 +33,26 @@ func (c *userController) PurchasePremium(w http.ResponseWriter, r *http.Request)
 	}
 
 	var input struct {
-		Feature string `json:"feature"`
+		Duration int      `json:"duration"` // Duration in days
+		Features []string `json:"features"` // List of features to enable
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		utils.ErrorResponse(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
-	err := c.userService.EnablePremiumFeature(userID, input.Feature)
+	if input.Duration <= 0 {
+		utils.ErrorResponse(w, http.StatusBadRequest, "Invalid duration")
+		return
+	}
+
+	err := c.userService.EnablePremiumFeature(userID, input.Duration, input.Features)
 	if err != nil {
 		utils.ErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	utils.DataSuccessResponse(w, http.StatusOK, map[string]string{"message": "Premium feature enabled successfully"})
+	utils.DataSuccessResponse(w, http.StatusOK, map[string]string{"message": "Premium features enabled successfully"})
 }
 
 func (c *userController) SwipeCandidates(w http.ResponseWriter, r *http.Request) {

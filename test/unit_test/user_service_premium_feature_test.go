@@ -19,28 +19,28 @@ func TestEnablePremiumFeature(t *testing.T) {
 		name          string
 		setupMocks    func()
 		userID        int
-		feature       string
+		duration      int
+		features      []string
 		expectedError string
 	}{
 		{
-			name: "Success - Unlimited Swipes",
+			name: "Success - Enable Unlimited Swipes and Verified Badge",
 			setupMocks: func() {
 				mockRepo.On("GetUserByID", 1).Return(&models.User{
-					ID:         1,
-					IsInactive: false,
-					PremiumFeatures: struct {
-						UnlimitedSwipes bool `json:"unlimited_swipes"`
-						IsVerified      bool `json:"profile_boost"`
-					}{
+					ID:            1,
+					IsInactive:    false,
+					PremiumExpiry: nil,
+					PremiumFeatures: models.PremiumFeatures{
 						UnlimitedSwipes: false,
+						IsVerified:      false,
 					},
 				}, nil)
 
-				// Correctly mock the UpdateUser method
 				mockRepo.On("UpdateUser", mock.AnythingOfType("*models.User")).Return(nil)
 			},
 			userID:        1,
-			feature:       "remove_swipe_limit",
+			duration:      30,
+			features:      []string{"UnlimitedSwipes", "IsVerified"},
 			expectedError: "",
 		},
 		{
@@ -49,7 +49,8 @@ func TestEnablePremiumFeature(t *testing.T) {
 				mockRepo.On("GetUserByID", 1).Return(nil, errors.New("user not found"))
 			},
 			userID:        1,
-			feature:       "remove_swipe_limit",
+			duration:      30,
+			features:      []string{"UnlimitedSwipes"},
 			expectedError: "user not found",
 		},
 		{
@@ -61,26 +62,9 @@ func TestEnablePremiumFeature(t *testing.T) {
 				}, nil)
 			},
 			userID:        1,
-			feature:       "remove_swipe_limit",
+			duration:      30,
+			features:      []string{"UnlimitedSwipes"},
 			expectedError: "user account is inactive",
-		},
-		{
-			name: "Error - Feature Already Active",
-			setupMocks: func() {
-				mockRepo.On("GetUserByID", 1).Return(&models.User{
-					ID:         1,
-					IsInactive: false,
-					PremiumFeatures: struct {
-						UnlimitedSwipes bool `json:"unlimited_swipes"`
-						IsVerified      bool `json:"profile_boost"`
-					}{
-						UnlimitedSwipes: true,
-					},
-				}, nil)
-			},
-			userID:        1,
-			feature:       "remove_swipe_limit",
-			expectedError: "unlimited swipes is already active",
 		},
 		{
 			name: "Error - Invalid Feature",
@@ -91,8 +75,26 @@ func TestEnablePremiumFeature(t *testing.T) {
 				}, nil)
 			},
 			userID:        1,
-			feature:       "invalid_feature",
-			expectedError: "invalid premium feature",
+			duration:      30,
+			features:      []string{"InvalidFeature"},
+			expectedError: "invalid premium feature: InvalidFeature",
+		},
+		{
+			name: "Error - Unlimited Swipes Already Active",
+			setupMocks: func() {
+				mockRepo.On("GetUserByID", 1).Return(&models.User{
+					ID:         1,
+					IsInactive: false,
+					PremiumFeatures: models.PremiumFeatures{
+						UnlimitedSwipes: true,
+						IsVerified:      false,
+					},
+				}, nil)
+			},
+			userID:        1,
+			duration:      30,
+			features:      []string{"UnlimitedSwipes"},
+			expectedError: "unlimited swipes is already active",
 		},
 	}
 
@@ -103,7 +105,7 @@ func TestEnablePremiumFeature(t *testing.T) {
 			tc.setupMocks()
 
 			// Call EnablePremiumFeature
-			err := service.EnablePremiumFeature(tc.userID, tc.feature)
+			err := service.EnablePremiumFeature(tc.userID, tc.duration, tc.features)
 
 			// Assertions
 			if tc.expectedError == "" {
